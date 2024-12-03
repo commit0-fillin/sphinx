@@ -166,13 +166,18 @@ class Sphinx:
         """True/False as to whether a new environment was created for this build,
         or None if the environment has not been initialised yet.
         """
-        pass
+        return self._fresh_env_used
 
     def _init_i18n(self) -> None:
         """Load translated strings from the configured localedirs if enabled in
         the configuration.
         """
-        pass
+        locale.setlocale(locale.LC_ALL, '')
+        locale.textdomain('sphinx')
+        locale_dirs = [path.join(package_dir, 'locale')] + self.config.locale_dirs
+        self.translator, has_translation = locale.init(locale_dirs, self.config.language)
+        if self.config.language and not has_translation:
+            logger.warning(__('No translation found for language %s'), self.config.language)
 
     def setup_extension(self, extname: str) -> None:
         """Import and setup a Sphinx extension module.
@@ -181,7 +186,27 @@ class Sphinx:
         extension needs the features provided by another extension.  No-op if
         called twice.
         """
-        pass
+        if extname in self.extensions:
+            return
+        try:
+            mod = __import__(extname, None, None, ['setup'])
+        except ImportError as err:
+            logger.warning(__('Failed to import extension %s'), extname)
+            logger.warning(__('The error was: %s'), err)
+            return
+        if not hasattr(mod, 'setup'):
+            logger.warning(__('Extension %s has no setup() function; is it really a Sphinx extension module?'), extname)
+            return
+        if extname in self.extensions:
+            logger.warning(__('Extension %s already loaded; ignoring subsequent import'), extname)
+            return
+        try:
+            mod.setup(self)
+        except Exception as err:
+            logger.warning(__('Failed to setup extension %s'), extname)
+            logger.warning(__('The error was: %s'), err)
+        else:
+            self.extensions[extname] = mod
 
     @staticmethod
     def require_sphinx(version: tuple[int, int] | str) -> None:
@@ -197,7 +222,15 @@ class Sphinx:
         .. versionchanged:: 7.1
            Type of *version* now allows ``(major, minor)`` form.
         """
-        pass
+        if isinstance(version, str):
+            version = tuple(int(x) for x in version.split('.'))
+        elif not isinstance(version, tuple):
+            raise TypeError('version must be a string or tuple')
+        
+        if version > sphinx.__version_info__[:2]:
+            raise VersionRequirementError(
+                __('This project needs at least Sphinx v%s and therefore cannot '
+                   'be built with this version.') % '.'.join(map(str, version)))
 
     def connect(self, event: str, callback: Callable, priority: int=500) -> int:
         """Register *callback* to be called when *event* is emitted.
