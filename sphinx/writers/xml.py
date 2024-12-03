@@ -27,4 +27,4 @@ class PseudoXMLWriter(BaseXMLWriter):
 
     def supports(self, format: str) -> bool:
         """All format-specific elements are supported."""
-        pass
+        return True
