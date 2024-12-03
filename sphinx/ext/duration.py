@@ -26,16 +26,26 @@ def on_builder_inited(app: Sphinx) -> None:
 
     This clears the results of the last build.
     """
-    pass
+    app.env.duration_data = {'reading_durations': {}}
 
 def on_source_read(app: Sphinx, docname: str, content: list[str]) -> None:
     """Start to measure reading duration."""
-    pass
+    app.env.duration_data['reading_durations'][docname] = time.time()
 
 def on_doctree_read(app: Sphinx, doctree: nodes.document) -> None:
     """Record a reading duration."""
-    pass
+    docname = app.env.docname
+    start_time = app.env.duration_data['reading_durations'].get(docname)
+    if start_time:
+        duration = time.time() - start_time
+        app.env.duration_data['reading_durations'][docname] = duration
 
 def on_build_finished(app: Sphinx, error: Exception) -> None:
     """Display duration ranking on the current build."""
-    pass
+    if not error:
+        durations = app.env.duration_data['reading_durations']
+        sorted_durations = sorted(durations.items(), key=itemgetter(1), reverse=True)
+        
+        logger.info("Document reading durations:")
+        for docname, duration in islice(sorted_durations, 10):  # Display top 10
+            logger.info(f"{docname}: {duration:.2f} seconds")
