@@ -9,4 +9,6 @@ class ImageAdapter:
 
     def get_original_image_uri(self, name: str) -> str:
         """Get the original image URI."""
-        pass
+        if name in self.env.images:
+            return self.env.images[name][0]
+        return name
