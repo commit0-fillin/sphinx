@@ -23,7 +23,7 @@ _INVALID_BUILTIN_CLASSES: Final[Mapping[object, str]] = {Context: 'contextvars.C
 
 def is_invalid_builtin_class(obj: Any) -> bool:
     """Check *obj* is an invalid built-in class."""
-    pass
+    return obj in _INVALID_BUILTIN_CLASSES
 TextlikeNode: TypeAlias = nodes.Text | nodes.TextElement
 PathMatcher: TypeAlias = Callable[[str], bool]
 if TYPE_CHECKING:
@@ -62,19 +62,22 @@ def get_type_hints(obj: Any, globalns: dict[str, Any] | None=None, localns: dict
     This is a simple wrapper of `typing.get_type_hints()` that does not raise an error on
     runtime.
     """
-    pass
+    try:
+        return typing.get_type_hints(obj, globalns, localns, include_extras)
+    except Exception:
+        return {}
 
 def is_system_TypeVar(typ: Any) -> bool:
     """Check *typ* is system defined TypeVar."""
-    pass
+    return isinstance(typ, TypeVar) and typ.__module__ == 'typing'
 
 def _is_annotated_form(obj: Any) -> TypeIs[Annotated[Any, ...]]:
     """Check if *obj* is an annotated type."""
-    pass
+    return isinstance(obj, type(Annotated[int, "metadata"]))
 
 def _is_unpack_form(obj: Any) -> bool:
     """Check if the object is :class:`typing.Unpack` or equivalent."""
-    pass
+    return getattr(obj, "__origin__", None) is getattr(typing, "Unpack", None)
 
 def restify(cls: Any, mode: _RestifyMode='fully-qualified-except-typing') -> str:
     """Convert a type-like object to a reST reference.
@@ -87,7 +90,22 @@ def restify(cls: Any, mode: _RestifyMode='fully-qualified-except-typing') -> str
                  'smart'
                      Show the name of the annotation.
     """
-    pass
+    if isinstance(cls, str):
+        return cls
+    elif isinstance(cls, type):
+        if mode == 'smart':
+            return cls.__name__
+        else:
+            module = cls.__module__
+            name = cls.__qualname__
+            if module == 'typing' or module == 'types':
+                return name
+            else:
+                return f'{module}.{name}'
+    elif cls is None:
+        return 'None'
+    else:
+        return str(cls)
 
 def stringify_annotation(annotation: Any, /, mode: _StringifyMode='fully-qualified-except-typing') -> str:
     """Stringify type annotation object.
@@ -103,7 +121,26 @@ def stringify_annotation(annotation: Any, /, mode: _StringifyMode='fully-qualifi
                  'fully-qualified'
                      Show the module name and qualified name of the annotation.
     """
-    pass
+    if isinstance(annotation, str):
+        return annotation
+    elif isinstance(annotation, type):
+        if mode == 'smart':
+            return annotation.__name__
+        elif mode == 'fully-qualified':
+            return f'{annotation.__module__}.{annotation.__qualname__}'
+        else:  # fully-qualified-except-typing
+            if annotation.__module__ == 'typing':
+                return annotation.__qualname__
+            else:
+                return f'{annotation.__module__}.{annotation.__qualname__}'
+    elif annotation is None:
+        return 'None'
+    elif _is_annotated_form(annotation):
+        return stringify_annotation(annotation.__origin__, mode=mode)
+    elif _is_unpack_form(annotation):
+        return f'Unpack[{stringify_annotation(annotation.__args__[0], mode=mode)}]'
+    else:
+        return str(annotation)
 _DEPRECATED_OBJECTS: dict[str, tuple[Any, str, tuple[int, int]]] = {}
 
 def __getattr__(name: str) -> Any:
