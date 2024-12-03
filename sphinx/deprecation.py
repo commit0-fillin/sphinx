@@ -45,4 +45,21 @@ def _deprecation_warning(module: str, attribute: str, canonical_name: str='', *,
            _deprecation_warning(__name__, name, canonical_name, remove=remove)
            return deprecated_object
     """
-    pass
+    major, minor = remove
+    version = f"{major}.{minor}"
+    
+    message = f"{module}.{attribute} is deprecated"
+    if canonical_name:
+        message += f" and will be removed in version {version}. Use {canonical_name} instead."
+    else:
+        message += f" and will be removed in version {version}."
+
+    if raises:
+        raise AttributeError(message)
+    else:
+        if major == 9:
+            warnings.warn(message, RemovedInSphinx90Warning, stacklevel=3)
+        elif major == 10:
+            warnings.warn(message, RemovedInSphinx10Warning, stacklevel=3)
+        else:
+            warnings.warn(message, DeprecationWarning, stacklevel=3)
