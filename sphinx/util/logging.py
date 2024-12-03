@@ -35,11 +35,15 @@ def getLogger(name: str) -> SphinxLoggerAdapter:
         >>> logger.info('Hello, this is an extension!')
         Hello, this is an extension!
     """
-    pass
+    logger = logging.getLogger(NAMESPACE + '.' + name)
+    return SphinxLoggerAdapter(logger, {})
 
 def convert_serializable(records: list[logging.LogRecord]) -> None:
     """Convert LogRecord serializable."""
-    pass
+    for record in records:
+        record.args = tuple(repr(arg) for arg in record.args)
+        record.exc_info = None
+        record.exc_text = None
 
 class SphinxLogRecord(logging.LogRecord):
     """Log record class supporting location"""
@@ -80,7 +84,10 @@ class SphinxLoggerAdapter(logging.LoggerAdapter):
         :param once: Do not log this warning,
             if a previous warning already has same ``msg``, ``args`` and ``once=True``.
         """
-        pass
+        kwargs.update(type=type, subtype=subtype, location=location, nonl=nonl, color=color, once=once)
+        for key in self.KEYWORDS:
+            kwargs.setdefault(key, None)
+        self.logger.warning(msg, *args, extra=kwargs)
 
 class WarningStreamHandler(logging.StreamHandler):
     """StreamHandler for warnings."""
@@ -102,7 +109,15 @@ def pending_warnings() -> Iterator[logging.Handler]:
 
     Similar to :func:`pending_logging`.
     """
-    pass
+    logger = logging.getLogger(NAMESPACE)
+    memhandler = MemoryHandler()
+    memhandler.setLevel(logging.WARNING)
+    logger.addHandler(memhandler)
+    try:
+        yield memhandler
+    finally:
+        logger.removeHandler(memhandler)
+        memhandler.flushTo(logger)
 
 @contextmanager
 def suppress_logging() -> Iterator[MemoryHandler]:
@@ -115,7 +130,15 @@ def suppress_logging() -> Iterator[MemoryHandler]:
         >>>     some_long_process()
         >>>
     """
-    pass
+    logger = logging.getLogger(NAMESPACE)
+    memhandler = MemoryHandler()
+    logger.addHandler(memhandler)
+    logger.propagate = False
+    try:
+        yield memhandler
+    finally:
+        logger.removeHandler(memhandler)
+        logger.propagate = True
 
 @contextmanager
 def pending_logging() -> Iterator[MemoryHandler]:
@@ -129,7 +152,14 @@ def pending_logging() -> Iterator[MemoryHandler]:
         >>>
         Warning message!  # the warning is flushed here
     """
-    pass
+    logger = logging.getLogger(NAMESPACE)
+    memhandler = MemoryHandler()
+    logger.addHandler(memhandler)
+    try:
+        yield memhandler
+    finally:
+        logger.removeHandler(memhandler)
+        memhandler.flushTo(logger)
 skip_warningiserror = nullcontext
 
 @contextmanager
@@ -143,7 +173,13 @@ def prefixed_warnings(prefix: str) -> Iterator[None]:
 
     .. versionadded:: 2.0
     """
-    pass
+    logger = logging.getLogger(NAMESPACE)
+    prefix_filter = MessagePrefixFilter(prefix)
+    logger.addFilter(prefix_filter)
+    try:
+        yield
+    finally:
+        logger.removeFilter(prefix_filter)
 
 class LogCollector:
 
@@ -158,7 +194,15 @@ class _RaiseOnWarningFilter(logging.Filter):
 
 def is_suppressed_warning(warning_type: str, sub_type: str, suppress_warnings: Set[str] | Sequence[str]) -> bool:
     """Check whether the warning is suppressed or not."""
-    pass
+    if warning_type is None:
+        return False
+
+    for suppress in suppress_warnings:
+        if suppress == warning_type:
+            return True
+        if sub_type and suppress == f"{warning_type}.{sub_type}":
+            return True
+    return False
 
 class WarningSuppressor(logging.Filter):
     """Filter logs by `suppress_warnings`."""
@@ -166,6 +210,7 @@ class WarningSuppressor(logging.Filter):
     def __init__(self, app: Sphinx) -> None:
         self.app = app
         super().__init__()
+        self.suppress_warnings = set(app.config.suppress_warnings)
 
 class MessagePrefixFilter(logging.Filter):
     """Prepend prefix to all log records."""
@@ -220,4 +265,25 @@ class LastMessagesWriter:
 
 def setup(app: Sphinx, status: IO, warning: IO) -> None:
     """Setup root logger for Sphinx"""
-    pass
+    logger = logging.getLogger(NAMESPACE)
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
+
+    # Status handler
+    status_handler = NewLineStreamHandler(stream=status)
+    status_handler.setLevel(VERBOSITY_MAP[app.verbosity])
+    status_handler.addFilter(InfoFilter())
+    status_handler.setFormatter(ColorizeFormatter())
+    logger.addHandler(status_handler)
+
+    # Warning handler
+    warning_handler = WarningStreamHandler(stream=warning)
+    warning_handler.setLevel(logging.WARNING)
+    warning_handler.setFormatter(ColorizeFormatter())
+    logger.addHandler(warning_handler)
+
+    # Add warning suppressor
+    logger.addFilter(WarningSuppressor(app))
+
+    # Add SphinxLogRecordTranslator
+    logger.addFilter(SphinxLogRecordTranslator(app))
