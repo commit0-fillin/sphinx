@@ -12,8 +12,12 @@ _GMT_OFFSET = float(time.localtime().tm_gmtoff)
 
 def epoch_to_rfc1123(epoch: float) -> str:
     """Return HTTP-date string from epoch offset."""
-    pass
+    t = time.gmtime(epoch)
+    return time.strftime("%a, %d %b %Y %H:%M:%S GMT", t)
 
 def rfc1123_to_epoch(rfc1123: str) -> float:
     """Return epoch offset from HTTP-date string."""
-    pass
+    t = parsedate_tz(rfc1123)
+    if t is None:
+        raise ValueError("Invalid RFC 1123 date format")
+    return time.mktime(t[:9]) - _GMT_OFFSET
