@@ -6,7 +6,10 @@ OPERATORS: dict[type[ast.AST], str] = {ast.Add: '+', ast.And: 'and', ast.BitAnd:
 
 def unparse(node: ast.AST | None, code: str='') -> str | None:
     """Unparse an AST to string."""
-    pass
+    if node is None:
+        return None
+    visitor = _UnparseVisitor(code)
+    return visitor.visit(node)
 
 class _UnparseVisitor(ast.NodeVisitor):
 
@@ -17,4 +20,9 @@ class _UnparseVisitor(ast.NodeVisitor):
 
     def _visit_arg_with_default(self, arg: ast.arg, default: ast.AST | None) -> str:
         """Unparse a single argument to a string."""
-        pass
+        result = arg.arg
+        if arg.annotation:
+            result += ': ' + self.visit(arg.annotation)
+        if default:
+            result += ' = ' + self.visit(default)
+        return result
