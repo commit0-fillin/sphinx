@@ -49,7 +49,7 @@ class Index(ABC):
         self.domain = domain
 
     @abstractmethod
-    def generate(self, docnames: Iterable[str] | None=None) -> tuple[list[tuple[str, list[IndexEntry]]], bool]:
+    def generate(self, docnames: Iterable[str] | None = None) -> tuple[list[tuple[str, list[IndexEntry]]], bool]:
         """Get entries for the index.
 
         If ``docnames`` is given, restrict to entries referring to these
@@ -99,4 +99,39 @@ class Index(ABC):
         Qualifier and description are not rendered for some output formats such
         as LaTeX.
         """
-        pass
+        # This is a base implementation that should be overridden by subclasses
+        entries = []
+        if docnames:
+            # Filter entries based on the given docnames
+            entries = [entry for entry in self.domain.get_objects()
+                       if entry.docname in docnames]
+        else:
+            # Get all entries from the domain
+            entries = self.domain.get_objects()
+
+        # Sort entries alphabetically
+        entries.sort(key=lambda e: e.name.lower())
+
+        # Group entries by their first letter
+        grouped_entries = {}
+        for entry in entries:
+            first_letter = entry.name[0].upper()
+            if first_letter not in grouped_entries:
+                grouped_entries[first_letter] = []
+            grouped_entries[first_letter].append(IndexEntry(
+                name=entry.name,
+                subtype=0,  # Assume all entries are normal entries
+                docname=entry.docname,
+                anchor=entry.anchor,
+                extra='',
+                qualifier='',
+                descr=entry.type
+            ))
+
+        # Convert grouped entries to the required format
+        content = [(letter, grouped_entries[letter]) for letter in sorted(grouped_entries.keys())]
+
+        # Determine if sub-entries should be collapsed (default to False)
+        collapse = False
+
+        return content, collapse
