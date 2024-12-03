@@ -9,7 +9,27 @@ _COLOURING_DISABLED = True
 
 def terminal_supports_colour() -> bool:
     """Return True if coloured terminal output is supported."""
-    pass
+    if _COLOURING_DISABLED:
+        return False
+    
+    # Check if the output is a TTY
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        return False
+
+    # Check for specific environment variables
+    if os.environ.get('ANSI_COLORS_DISABLED') is not None:
+        return False
+
+    # Check for Windows
+    if sys.platform == 'win32':
+        return True  # We're using colorama on Windows, so color should be supported
+
+    # Check for known color-supporting terminals
+    if os.environ.get('TERM') in ('xterm', 'xterm-color', 'xterm-256color', 'linux',
+                                  'screen', 'screen-256color', 'screen-bce'):
+        return True
+
+    return False
 if sys.platform == 'win32':
     _create_input_mode_colour_func = _create_colour_func
 reset = _create_colour_func('39;49;00')
