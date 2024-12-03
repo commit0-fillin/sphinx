@@ -81,7 +81,7 @@ class SphinxParallelError(SphinxError):
         self.traceback = traceback
 
     def __str__(self) -> str:
-        return self.message
+        return f"{self.category}: {self.message}"
 
 class PycodeError(Exception):
     """Pycode Python source code analyser error."""
