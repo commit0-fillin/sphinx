@@ -13,7 +13,9 @@ FILESYSTEMENCODING = sys.getfilesystemencoding() or sys.getdefaultencoding()
 
 def getumask() -> int:
     """Get current umask value"""
-    pass
+    umask = os.umask(0)
+    os.umask(umask)
+    return umask
 UMASK = getumask()
 
 class path(str):
@@ -27,43 +29,43 @@ class path(str):
         """
         The name of the directory the file or directory is in.
         """
-        pass
+        return path(os.path.dirname(self))
 
     def abspath(self) -> path:
         """
         Returns the absolute path.
         """
-        pass
+        return path(os.path.abspath(self))
 
     def isabs(self) -> bool:
         """
         Returns ``True`` if the path is absolute.
         """
-        pass
+        return os.path.isabs(self)
 
     def isdir(self) -> bool:
         """
         Returns ``True`` if the path is a directory.
         """
-        pass
+        return os.path.isdir(self)
 
     def isfile(self) -> bool:
         """
         Returns ``True`` if the path is a file.
         """
-        pass
+        return os.path.isfile(self)
 
     def islink(self) -> bool:
         """
         Returns ``True`` if the path is a symbolic link.
         """
-        pass
+        return os.path.islink(self)
 
     def ismount(self) -> bool:
         """
         Returns ``True`` if the path is a mount point.
         """
-        pass
+        return os.path.ismount(self)
 
     def rmtree(self, ignore_errors: bool=False, onerror: Callable[[Callable[..., Any], str, Any], object] | None=None) -> None:
         """
@@ -81,7 +83,7 @@ class path(str):
             caused it to fail and `exc_info` is a tuple as returned by
             :func:`sys.exc_info`.
         """
-        pass
+        shutil.rmtree(self, ignore_errors=ignore_errors, onerror=onerror)
 
     def copytree(self, destination: str, symlinks: bool=False) -> None:
         """
@@ -93,7 +95,7 @@ class path(str):
             links in the destination tree otherwise the contents of the files
             pointed to by the symbolic links are copied.
         """
-        pass
+        shutil.copytree(self, destination, symlinks=symlinks)
 
     def movetree(self, destination: str) -> None:
         """
@@ -103,38 +105,41 @@ class path(str):
         If the `destination` is a file it may be overwritten depending on the
         :func:`os.rename` semantics.
         """
-        pass
+        shutil.move(self, destination)
     move = movetree
 
     def unlink(self) -> None:
         """
         Removes a file.
         """
-        pass
+        os.unlink(self)
 
     def stat(self) -> Any:
         """
         Returns a stat of the file.
         """
-        pass
+        return os.stat(self)
 
     def write_text(self, text: str, encoding: str='utf-8', **kwargs: Any) -> None:
         """
         Writes the given `text` to the file.
         """
-        pass
+        with open(self, 'w', encoding=encoding, **kwargs) as f:
+            f.write(text)
 
     def read_text(self, encoding: str='utf-8', **kwargs: Any) -> str:
         """
         Returns the text in the file.
         """
-        pass
+        with open(self, 'r', encoding=encoding, **kwargs) as f:
+            return f.read()
 
     def read_bytes(self) -> builtins.bytes:
         """
         Returns the bytes in the file.
         """
-        pass
+        with open(self, 'rb') as f:
+            return f.read()
 
     def write_bytes(self, bytes: bytes, append: bool=False) -> None:
         """
@@ -143,32 +148,34 @@ class path(str):
         :param append:
             If ``True`` given `bytes` are added at the end of the file.
         """
-        pass
+        mode = 'ab' if append else 'wb'
+        with open(self, mode) as f:
+            f.write(bytes)
 
     def exists(self) -> bool:
         """
         Returns ``True`` if the path exist.
         """
-        pass
+        return os.path.exists(self)
 
     def lexists(self) -> bool:
         """
         Returns ``True`` if the path exists unless it is a broken symbolic
         link.
         """
-        pass
+        return os.path.lexists(self)
 
     def makedirs(self, mode: int=511, exist_ok: bool=False) -> None:
         """
         Recursively create directories.
         """
-        pass
+        os.makedirs(self, mode=mode, exist_ok=exist_ok)
 
     def joinpath(self, *args: Any) -> path:
         """
         Joins the path with the argument given and returns the result.
         """
-        pass
+        return path(os.path.join(self, *args))
     __div__ = __truediv__ = joinpath
 
     def __repr__(self) -> str:
