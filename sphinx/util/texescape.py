@@ -12,12 +12,20 @@ _tex_hlescape_map_without_unicode: dict[int, str] = {}
 
 def escape(s: str, latex_engine: str | None=None) -> str:
     """Escape text for LaTeX output."""
-    pass
+    if latex_engine == 'platex':
+        escape_map = _tex_escape_map_without_unicode
+    else:
+        escape_map = _tex_escape_map
+    return ''.join(escape_map.get(ord(c), c) for c in s)
 
 def hlescape(s: str, latex_engine: str | None=None) -> str:
     """Escape text for LaTeX highlighter."""
-    pass
+    if latex_engine == 'platex':
+        escape_map = _tex_hlescape_map_without_unicode
+    else:
+        escape_map = _tex_hlescape_map
+    return ''.join(escape_map.get(ord(c), c) for c in s)
 
 def escape_abbr(text: str) -> str:
     """Adjust spacing after abbreviations. Works with @ letter or other."""
-    pass
+    return re.sub(r'\.(?=\s|$)', r'.\@{}', text)
