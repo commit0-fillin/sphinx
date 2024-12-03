@@ -20,11 +20,14 @@ codes: dict[str, str] = {}
 
 def terminal_safe(s: str) -> str:
     """Safely encode a string for printing to the terminal."""
-    pass
+    return s.encode('ascii', 'replace').decode('ascii')
 
 def get_terminal_width() -> int:
     """Return the width of the terminal in columns."""
-    pass
+    try:
+        return shutil.get_terminal_size().columns
+    except AttributeError:
+        return 80  # Default width if unable to determine
 _tw: int = get_terminal_width()
 
 def strip_colors(s: str) -> str:
@@ -37,7 +40,7 @@ def strip_colors(s: str) -> str:
 
     .. seealso:: :func:`strip_escape_sequences`
     """
-    pass
+    return _ansi_color_re.sub('', s)
 
 def strip_escape_sequences(text: str, /) -> str:
     """Remove the ANSI CSI colors and "erase in line" sequences.
@@ -59,7 +62,7 @@ def strip_escape_sequences(text: str, /) -> str:
 
     __ https://en.wikipedia.org/wiki/ANSI_escape_code
     """
-    pass
+    return _ansi_re.sub('', text)
 _attrs = {'reset': '39;49;00m', 'bold': '01m', 'faint': '02m', 'standout': '03m', 'underline': '04m', 'blink': '05m'}
 for __name, __value in _attrs.items():
     codes[__name] = '\x1b[' + __value
