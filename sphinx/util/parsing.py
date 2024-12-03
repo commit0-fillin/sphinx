@@ -37,4 +37,30 @@ def nested_parse_to_nodes(state: RSTState, text: str | StringList, *, source: st
 
     .. versionadded:: 7.4
     """
-    pass
+    if isinstance(text, str):
+        text = StringList(string2lines(text), source=source)
+    elif isinstance(text, StringList):
+        text.source = source
+
+    memo = state.memo
+    old_allow_section_headings = memo.allow_section_headings
+    old_title_context = memo.title_context
+
+    try:
+        if not allow_section_headings:
+            memo.allow_section_headings = False
+
+        if not keep_title_context:
+            memo.title_context = None
+
+        node = Element()
+        node.source = source
+        node.line = offset + 1
+
+        with contextlib.suppress(state.nested_parse):
+            state.nested_parse(text, offset, node)
+
+        return node.children
+    finally:
+        memo.allow_section_headings = old_allow_section_headings
+        memo.title_context = old_title_context
