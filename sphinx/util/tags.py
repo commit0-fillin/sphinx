@@ -38,4 +38,28 @@ class Tags:
         are permitted, and operate on tag names, where truthy values mean
         the tag is present and vice versa.
         """
-        pass
+        if condition in self._condition_cache:
+            return self._condition_cache[condition]
+
+        try:
+            parser = BooleanParser(_ENV.parse(condition))
+            ast = parser.parse_expression()
+            result = self._eval_node(ast)
+            self._condition_cache[condition] = result
+            return result
+        except jinja2.exceptions.TemplateSyntaxError as e:
+            raise ValueError(f"Invalid condition: {condition}") from e
+
+    def _eval_node(self, node: jinja2.nodes.Node) -> bool:
+        if isinstance(node, jinja2.nodes.Name):
+            return node.name in self._tags
+        elif isinstance(node, jinja2.nodes.Not):
+            return not self._eval_node(node.node)
+        elif isinstance(node, jinja2.nodes.And):
+            return self._eval_node(node.left) and self._eval_node(node.right)
+        elif isinstance(node, jinja2.nodes.Or):
+            return self._eval_node(node.left) or self._eval_node(node.right)
+        elif isinstance(node, jinja2.nodes.Const):
+            return bool(node.value)
+        else:
+            raise ValueError(f"Unsupported node type: {type(node)}")
