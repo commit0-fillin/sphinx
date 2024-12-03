@@ -71,5 +71,11 @@ for __i, (__dark, __light) in enumerate(_colors, 30):
     codes[__dark] = '\x1b[%im' % __i
     codes[__light] = '\x1b[%im' % (__i + 60)
 _orig_codes = codes.copy()
+
+def create_color_func(name):
+    def color_func(text):
+        return codes.get(name, '') + text + codes.get('reset', '')
+    globals()[name] = color_func
+
 for _name in codes:
     create_color_func(_name)
