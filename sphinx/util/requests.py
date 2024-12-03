@@ -10,21 +10,31 @@ _USER_AGENT = f'Mozilla/5.0 (X11; Linux x86_64; rv:100.0) Gecko/20100101 Firefox
 
 def _get_tls_cacert(url: str, certs: str | dict[str, str] | None) -> str | bool:
     """Get additional CA cert for a specific URL."""
-    pass
+    if certs is None:
+        return True
+    elif isinstance(certs, str):
+        return certs
+    elif isinstance(certs, dict):
+        hostname = urlsplit(url).hostname
+        if hostname:
+            return certs.get(hostname, True)
+    return True
 
 def get(url: str, **kwargs: Any) -> requests.Response:
     """Sends a GET request like ``requests.get()``.
 
     This sets up User-Agent header and TLS verification automatically.
     """
-    pass
+    kwargs.setdefault('allow_redirects', True)
+    return _Session().request('GET', url, **kwargs)
 
 def head(url: str, **kwargs: Any) -> requests.Response:
     """Sends a HEAD request like ``requests.head()``.
 
     This sets up User-Agent header and TLS verification automatically.
     """
-    pass
+    kwargs.setdefault('allow_redirects', False)
+    return _Session().request('HEAD', url, **kwargs)
 
 class _Session(requests.Session):
 
@@ -33,4 +43,14 @@ class _Session(requests.Session):
 
         This sets up User-Agent header and TLS verification automatically.
         """
-        pass
+        kwargs.setdefault('headers', {}).setdefault('User-Agent', _user_agent or _USER_AGENT)
+
+        if _tls_info:
+            verify, certs = _tls_info
+            if verify:
+                kwargs['verify'] = _get_tls_cacert(url, certs)
+            else:
+                kwargs['verify'] = False
+                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+
+        return super().request(method, url, **kwargs)
