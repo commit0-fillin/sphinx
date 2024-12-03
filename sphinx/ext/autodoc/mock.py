@@ -92,7 +92,9 @@ class MockFinder(MetaPathFinder):
 
     def invalidate_caches(self) -> None:
         """Invalidate mocked modules on sys.modules."""
-        pass
+        for modname in self.mocked_modules:
+            sys.modules.pop(modname, None)
+        self.mocked_modules.clear()
 
 @contextlib.contextmanager
 def mock(modnames: list[str]) -> Iterator[None]:
@@ -102,19 +104,27 @@ def mock(modnames: list[str]) -> Iterator[None]:
         # mock modules are enabled here
         ...
     """
-    pass
+    finder = MockFinder(modnames)
+    sys.meta_path.insert(0, finder)
+    try:
+        yield
+    finally:
+        sys.meta_path.remove(finder)
+        finder.invalidate_caches()
 
 def ismockmodule(subject: Any) -> TypeIs[_MockModule]:
     """Check if the object is a mocked module."""
-    pass
+    return isinstance(subject, _MockModule)
 
 def ismock(subject: Any) -> bool:
     """Check if the object is mocked."""
-    pass
+    return hasattr(subject, '__sphinx_mock__')
 
 def undecorate(subject: _MockObject) -> Any:
     """Unwrap mock if *subject* is decorated by mocked object.
 
     If not decorated, returns given *subject* itself.
     """
-    pass
+    if ismock(subject) and subject.__sphinx_decorator_args__:
+        return subject.__sphinx_decorator_args__[0]
+    return subject
