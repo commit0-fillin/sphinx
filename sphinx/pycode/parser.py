@@ -19,7 +19,12 @@ emptyline_re = re.compile('^\\s*(#.*)?$')
 
 def get_assign_targets(node: ast.AST) -> list[ast.expr]:
     """Get list of targets from Assign and AnnAssign node."""
-    pass
+    if isinstance(node, ast.Assign):
+        return node.targets
+    elif isinstance(node, ast.AnnAssign):
+        return [node.target]
+    else:
+        return []
 
 def get_lvar_names(node: ast.AST, self: ast.arg | None=None) -> list[str]:
     """Convert assignment-AST to variable names.
@@ -30,11 +35,40 @@ def get_lvar_names(node: ast.AST, self: ast.arg | None=None) -> list[str]:
         dic["bar"] = 'baz'
         # => TypeError
     """
-    pass
+    if isinstance(node, (ast.Name, ast.Attribute)):
+        if isinstance(node, ast.Name):
+            return [node.id]
+        else:
+            if node.value == self:
+                return [node.attr]
+            else:
+                raise TypeError('The assignment does not create a new variable')
+    elif isinstance(node, (ast.Tuple, ast.List)):
+        names = []
+        for elt in node.elts:
+            names.extend(get_lvar_names(elt, self))
+        return names
+    else:
+        raise TypeError('The assignment does not create a new variable')
 
 def dedent_docstring(s: str) -> str:
     """Remove common leading indentation from docstring."""
-    pass
+    if not s:
+        return s
+    lines = s.expandtabs().splitlines()
+    # Find minimum indentation (first line doesn't count)
+    indent = min(len(line) - len(line.lstrip()) for line in lines[1:] if line.strip())
+    # Remove indentation (first line is special)
+    result = [lines[0].strip()]
+    if indent < 0:
+        indent = 0
+    result += [line[indent:].rstrip() for line in lines[1:]]
+    # Strip any blank lines from the beginning and end of the docstring
+    while result and not result[-1]:
+        result.pop()
+    while result and not result[0]:
+        result.pop(0)
+    return '\n'.join(result)
 
 class Token:
     """Better token wrapper for tokenize module."""
@@ -72,21 +106,46 @@ class TokenProcessor:
 
     def get_line(self, lineno: int) -> str:
         """Returns specified line."""
-        pass
+        return self.buffers[lineno - 1]
 
     def fetch_token(self) -> Token | None:
         """Fetch the next token from source code.
 
         Returns ``None`` if sequence finished.
         """
-        pass
+        try:
+            token = next(self.tokens)
+            self.previous = self.current
+            self.current = Token(*token)
+            return self.current
+        except StopIteration:
+            self.previous = self.current
+            self.current = None
+            return None
 
     def fetch_until(self, condition: Any) -> list[Token]:
         """Fetch tokens until specified token appeared.
 
         .. note:: This also handles parenthesis well.
         """
-        pass
+        tokens = []
+        while True:
+            token = self.fetch_token()
+            if token is None:
+                return tokens
+            if isinstance(condition, str) and token == condition:
+                return tokens
+            elif isinstance(condition, (list, tuple)) and token in condition:
+                return tokens
+            elif callable(condition) and condition(token):
+                return tokens
+            tokens.append(token)
+            if token == '(':
+                tokens.extend(self.fetch_until(')'))
+            elif token == '[':
+                tokens.extend(self.fetch_until(']'))
+            elif token == '{':
+                tokens.extend(self.fetch_until('}'))
 
 class AfterCommentParser(TokenProcessor):
     """Python source code parser to pick up comments after assignments.
@@ -101,11 +160,51 @@ class AfterCommentParser(TokenProcessor):
 
     def fetch_rvalue(self) -> list[Token]:
         """Fetch right-hand value of assignment."""
-        pass
+        tokens = []
+        while True:
+            token = self.fetch_token()
+            if token is None:
+                break
+            elif token == ',' or token == ')':
+                break
+            elif token == '(':
+                tokens.append(token)
+                tokens.extend(self.fetch_until(')'))
+                tokens.append(self.fetch_token())  # consume ')'
+            elif token == '[':
+                tokens.append(token)
+                tokens.extend(self.fetch_until(']'))
+                tokens.append(self.fetch_token())  # consume ']'
+            elif token == '{':
+                tokens.append(token)
+                tokens.extend(self.fetch_until('}'))
+                tokens.append(self.fetch_token())  # consume '}'
+            else:
+                tokens.append(token)
+        return tokens
 
     def parse(self) -> None:
         """Parse the code and obtain comment after assignment."""
-        pass
+        # skip lvalue (or whole of AnnAssign)
+        while True:
+            token = self.fetch_token()
+            if token is None:
+                return
+            if token == '=' or token == ':':
+                break
+
+        # skip rvalue (if exists)
+        rvalue = self.fetch_rvalue()
+        if not rvalue:
+            return  # this is a type-hint
+
+        token = self.fetch_token()
+        if token is None:
+            return
+        if token.kind == COMMENT and token.value.startswith('#:'):
+            self.comment = token.value[2:].strip()
+        else:
+            self.fetch_until(NEWLINE)
 
 class VariableCommentPicker(ast.NodeVisitor):
     """Python source code parser to pick up variable comments."""
