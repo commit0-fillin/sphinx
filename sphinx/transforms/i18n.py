@@ -36,9 +36,26 @@ def publish_msgstr(app: Sphinx, source: str, source_path: str, source_line: int,
     :param sphinx.config.Config config: sphinx config
     :param docutils.frontend.Values settings: docutils settings
     :return: document
-    :rtype: docutils.nodes.document
+    :rtype: docutils.node.document
     """
-    pass
+    from docutils.core import publish_doctree
+    
+    # Create a new settings object with the provided settings
+    new_settings = settings.copy()
+    new_settings.report_level = 5  # Suppress all warnings
+    
+    # Create a StringInput object from the source
+    source_input = StringInput(source=source, source_path=source_path, encoding='utf-8')
+    
+    # Publish the doctree
+    document = publish_doctree(source=source_input, settings=new_settings)
+    
+    # Set the source information
+    for node in document.traverse():
+        node.source = source_path
+        node.line = source_line
+    
+    return document
 
 class PreserveTranslatableMessages(SphinxTransform):
     """
@@ -57,7 +74,21 @@ class _NodeUpdater:
 
     def compare_references(self, old_refs: Sequence[nodes.Element], new_refs: Sequence[nodes.Element], warning_msg: str) -> None:
         """Warn about mismatches between references in original and translated content."""
-        pass
+        if len(old_refs) != len(new_refs):
+            logger.warning(warning_msg + ' (number of references mismatch)')
+            return
+
+        for old_ref, new_ref in zip(old_refs, new_refs):
+            if old_ref['reftype'] != new_ref['reftype']:
+                logger.warning(warning_msg + ' (reference type mismatch)')
+            elif old_ref['refexplicit'] != new_ref['refexplicit']:
+                logger.warning(warning_msg + ' (reference explicitness mismatch)')
+            elif old_ref.get('refid') != new_ref.get('refid'):
+                logger.warning(warning_msg + ' (reference ID mismatch)')
+            elif old_ref.get('refuri') != new_ref.get('refuri'):
+                logger.warning(warning_msg + ' (reference URI mismatch)')
+            elif old_ref.get('refcaption') != new_ref.get('refcaption'):
+                logger.warning(warning_msg + ' (reference caption mismatch)')
 
 class Locale(SphinxTransform):
     """
